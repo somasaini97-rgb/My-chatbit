@@ -4,37 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Universal AI Chat</title>
-    <!-- Tailwind CSS via CDN -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify for safe HTML rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     
-    <!-- Optional Custom Configuration for Tailwind to match Gemini colors -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        gemini: {
-                            bg: '#f0f4f9',
-                            sidebar: '#e3e3e3',
-                            userBubble: '#e3e3e3',
-                            text: '#1f1f1f',
-                            primary: '#0b57d0'
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
                         }
-                    },
-                    fontFamily: {
-                        sans: ['"Google Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
                     }
                 }
             }
         }
     </script>
-
     <style>
-        /* Minimalist Scrollbar */
+        /* Custom scrollbar for a cleaner look */
         ::-webkit-scrollbar {
             width: 8px;
+            height: 8px;
         }
         ::-webkit-scrollbar-track {
             background: transparent;
@@ -46,540 +44,398 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
-        
-        /* Markdown-like formatting styles for AI output */
-        .prose p { margin-bottom: 1em; }
-        .prose pre { background: #1e293b; color: #f8fafc; padding: 1em; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1em; }
-        .prose code { font-family: monospace; background: #f1f5f9; padding: 0.2em 0.4em; border-radius: 0.25rem; }
-        .prose pre code { background: transparent; padding: 0; }
-        
-        /* Loader animation */
-        .typing-indicator span {
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            background-color: #94a3b8;
-            border-radius: 50%;
-            margin-right: 4px;
-            animation: typing 1.4s infinite ease-in-out both;
+        .prose pre {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
         }
-        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes typing {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
+        .prose code {
+            font-family: monospace;
+            background-color: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-size: 0.875em;
         }
+        .prose pre code {
+            background-color: transparent;
+            padding: 0;
+            color: inherit;
+        }
+        .prose p { margin-bottom: 0.75rem; }
     </style>
 </head>
-<body class="flex h-screen w-full bg-white text-gemini-text antialiased overflow-hidden selection:bg-blue-200">
-
-    <!-- Mobile Overlay -->
-    <div id="mobileOverlay" class="fixed inset-0 bg-black/50 z-20 hidden lg:hidden transition-opacity" onclick="toggleSidebar()"></div>
+<body class="bg-white text-gray-800 h-screen flex overflow-hidden font-sans">
 
     <!-- Sidebar -->
-    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-30 w-72 bg-gemini-bg transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col border-r border-gray-200">
-        <!-- Logo & Mobile Close -->
-        <div class="flex items-center justify-between p-4 ml-2">
-            <div class="flex items-center gap-3 text-xl font-medium cursor-pointer">
-                <i class="fa-solid fa-sparkles text-gemini-primary"></i>
-                <span>Universal AI</span>
-            </div>
-            <button class="lg:hidden text-gray-500 hover:text-gray-800 p-2" onclick="toggleSidebar()">
-                <i class="fa-solid fa-xmark text-xl"></i>
+    <aside id="sidebar" class="w-72 bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 transform translate-x-0 absolute z-20 h-full md:relative md:translate-x-0 shadow-lg md:shadow-none">
+        <div class="p-4 flex items-center justify-between">
+            <button id="new-chat-btn" class="flex items-center gap-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-full font-medium transition-colors w-full shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg>
+                New Chat
             </button>
-        </div>
-
-        <!-- New Chat Button -->
-        <div class="px-4 py-2">
-            <button onclick="startNewChat()" class="flex items-center gap-3 w-full bg-white hover:bg-gray-100 border border-gray-200 text-sm font-medium py-3 px-4 rounded-full transition-colors shadow-sm">
-                <i class="fa-solid fa-plus"></i>
-                New chat
+            <button id="close-sidebar-btn" class="md:hidden p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-200 ml-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path></svg>
             </button>
-        </div>
-
-        <!-- Chat History List -->
-        <div class="flex-1 overflow-y-auto mt-4 px-3 pb-4">
-            <p class="text-xs font-semibold text-gray-500 mb-2 px-3 uppercase tracking-wider">Recent</p>
-            <ul id="chatList" class="space-y-1">
-                <!-- Chat history items injected here via JS -->
-            </ul>
         </div>
         
-        <!-- Bottom settings/user area -->
-        <div onclick="openSettings()" class="p-4 border-t border-gray-200 text-sm text-gray-600 hover:bg-gray-100 cursor-pointer rounded-lg mx-2 mb-2 transition-colors">
-            <div class="flex items-center gap-3">
-                <i class="fa-solid fa-gear text-xl"></i>
-                <span>Settings</span>
-            </div>
+        <div class="px-4 pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent</div>
+        
+        <div id="history-list" class="flex-1 overflow-y-auto px-2 pb-4 space-y-1">
+            <!-- Chat history injected here -->
+        </div>
+
+        <div class="p-4 border-t border-gray-200">
+            <button id="open-settings-btn" class="flex items-center gap-3 w-full p-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.51a8,8,0,0,0-3.25,5.53l-2.83,25.46a77.27,77.27,0,0,1-10.36,10.36l-25.46,2.83a8,8,0,0,0-5.53,3.25l-20,16A91.17,91.17,0,0,1,130,200a8,8,0,0,0-6.4,0,91.17,91.17,0,0,1-24.42-3.13l-20-16a8,8,0,0,0-5.53-3.25L48.24,174.8a77.27,77.27,0,0,1-10.36-10.36l2.83-25.46a8,8,0,0,0-3.25-5.53l-16-20A91.17,91.17,0,0,1,24.62,89a8,8,0,0,0,0-6.4,91.17,91.17,0,0,1,3.13-24.42l16-20a8,8,0,0,0,3.25-5.53l2.83-25.46A77.27,77.27,0,0,1,60.2,16.8l25.46-2.83a8,8,0,0,0,5.53-3.25l20-16A91.17,91.17,0,0,1,126,24.62a8,8,0,0,0,6.4,0,91.17,91.17,0,0,1,24.42,3.13l20,16a8,8,0,0,0,5.53,3.25l25.46,2.83a77.27,77.27,0,0,1,10.36,10.36l-2.83,25.46a8,8,0,0,0,3.25,5.53l16,20A91.17,91.17,0,0,1,231.38,136a8,8,0,0,0,0,6.4,91.17,91.17,0,0,1-3.13,24.42Z"></path></svg>
+                Settings
+            </button>
         </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col relative h-full w-full bg-white transition-all duration-300">
-        
-        <!-- Top Navigation -->
-        <header class="flex items-center justify-between p-4 lg:px-8 absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-white to-transparent h-20">
-            <div class="flex items-center gap-4">
-                <button class="lg:hidden text-gray-500 hover:text-gray-800 p-2 -ml-2" onclick="toggleSidebar()">
-                    <i class="fa-solid fa-bars text-xl"></i>
+    <!-- Main Chat Area -->
+    <main class="flex-1 flex flex-col h-full relative">
+        <!-- Header -->
+        <header class="h-16 flex items-center justify-between px-4 sticky top-0 bg-white/80 backdrop-blur-md z-10">
+            <div class="flex items-center gap-3">
+                <button id="toggle-sidebar-btn" class="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors md:hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"></path></svg>
                 </button>
-                <h1 id="currentChatTitle" class="text-xl lg:text-2xl font-medium text-gray-400 truncate">Universal AI</h1>
+                <h1 class="text-xl font-semibold text-gray-700 tracking-tight">AI Chat</h1>
             </div>
         </header>
 
-        <!-- Chat Messages Container -->
-        <div id="chatContainer" class="flex-1 overflow-y-auto px-4 lg:px-32 pt-24 pb-32 scroll-smooth">
-            <!-- Messages injected here via JS -->
-            
-            <!-- Empty State / Welcome Screen -->
-            <div id="welcomeScreen" class="h-full flex flex-col items-center justify-center text-center px-4 fade-in">
-                <div class="w-20 h-20 bg-gemini-bg rounded-full flex items-center justify-center mb-6 shadow-sm">
-                    <i class="fa-solid fa-sparkles text-3xl text-gemini-primary"></i>
+        <!-- Chat Container -->
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
+            <!-- Welcome Screen -->
+            <div id="welcome-screen" class="h-full flex flex-col items-center justify-center text-center max-w-2xl mx-auto space-y-6">
+                <div class="w-16 h-16 bg-gradient-to-br from-brand-400 to-brand-600 rounded-full flex items-center justify-center shadow-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#ffffff" viewBox="0 0 256 256"><path d="M216.51,202.26a119.5,119.5,0,0,0-36.63-125A120,120,0,0,0,67.6,170.83,119.5,119.5,0,0,0,39.49,202.26a8,8,0,0,0,3.31,12.5A128,128,0,0,0,128,248h0a128,128,0,0,0,85.2-33.24A8,8,0,0,0,216.51,202.26ZM128,232a112,112,0,0,1-72-26.47,103.73,103.73,0,0,1,25-24A104,104,0,0,1,128,160a104,104,0,0,1,47,11.53,103.73,103.73,0,0,1,25,24A112,112,0,0,1,128,232Z"></path><path d="M128,144a56,56,0,1,0-56-56A56.06,56.06,0,0,0,128,144Zm0-96a40,40,0,1,1-40,40A40,40,0,0,1,128,48Z"></path></svg>
                 </div>
-                <h2 id="welcomeText" class="text-3xl lg:text-4xl font-medium mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-                    Hello, how can I help?
-                </h2>
-                <p class="text-gray-500 text-lg max-w-md">I'm a universal AI assistant. Ask me anything, or pick a conversation from the sidebar.</p>
+                <div>
+                    <h2 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-purple-600">How can I help you today?</h2>
+                    <p class="text-gray-500 mt-2">Enter your API key in settings to get started.</p>
+                </div>
+            </div>
+
+            <!-- Messages List -->
+            <div id="messages-list" class="max-w-3xl mx-auto space-y-6 hidden pb-4">
+                <!-- Messages injected here -->
+            </div>
+            
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="max-w-3xl mx-auto hidden mt-6 pb-4">
+                <div class="flex gap-4 items-start">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center flex-shrink-0 mt-1">
+                        <svg class="animate-spin text-white" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M232,128a104,104,0,0,1-208,0c0-41,23.81-78.36,60.66-95.27a8,8,0,0,1,6.68,14.54C60.15,61.59,40,93.27,40,128a88,88,0,0,0,176,0c0-34.73-20.15-66.41-51.34-80.73a8,8,0,0,1,6.68-14.54C208.19,49.64,232,87,232,128Z"></path></svg>
+                    </div>
+                    <div class="bg-gray-100 px-4 py-3 rounded-2xl rounded-tl-sm text-gray-500 text-sm">
+                        Thinking...
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Input Area -->
-        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-6 px-4 lg:px-32">
-            <div class="max-w-4xl mx-auto relative group">
-                <form id="chatForm" onsubmit="handleChatSubmit(event)" class="relative flex items-end">
-                    <textarea 
-                        id="messageInput"
-                        rows="1"
-                        placeholder="Enter a prompt here..."
-                        class="w-full bg-gemini-bg focus:bg-white border border-transparent focus:border-gray-300 rounded-3xl py-4 pl-6 pr-16 resize-none outline-none shadow-sm transition-all text-base max-h-48 overflow-y-auto"
-                        oninput="adjustTextareaHeight(this)"
-                        onkeydown="handleEnter(event)"
-                    ></textarea>
-                    <button type="submit" id="sendBtn" class="absolute right-3 bottom-3 p-2 bg-transparent text-gray-400 hover:text-gemini-primary rounded-full transition-colors disabled:opacity-50">
-                        <i class="fa-solid fa-paper-plane text-xl"></i>
-                    </button>
-                </form>
-                <div class="text-center mt-3 text-xs text-gray-400">
-                    AI can make mistakes. Consider verifying important information.
-                </div>
+        <div class="p-4 bg-white md:px-8 pb-6 md:pb-8">
+            <div class="max-w-3xl mx-auto relative flex items-end bg-gray-50 border border-gray-200 rounded-3xl p-2 shadow-sm focus-within:ring-2 focus-within:ring-brand-200 focus-within:border-brand-400 transition-all">
+                <textarea id="chat-input" rows="1" class="w-full bg-transparent resize-none outline-none py-3 px-4 max-h-32 text-gray-800 placeholder-gray-400 leading-relaxed" placeholder="Enter a prompt here..."></textarea>
+                <button id="send-btn" class="p-3 m-1 bg-brand-500 hover:bg-brand-600 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-192,64a16,16,0,0,0-2.42,29.84l85.62,40.55,40.55,85.62A15.86,15.86,0,0,0,157.74,256q.43,0,.87,0a16,16,0,0,0,14.71-10.76l64-192A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-35.46-74.9L161.66,117.66a8,8,0,0,0-11.32-11.32L111.05,145.63,36.15,110.17,216,50.08Z"></path></svg>
+                </button>
             </div>
+            <p class="text-center text-xs text-gray-400 mt-3">AI models can make mistakes. Verify important information.</p>
         </div>
     </main>
 
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="fixed inset-0 bg-black/40 z-50 hidden flex-col items-center justify-center transition-opacity opacity-0 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl w-full max-w-md p-6 transform scale-95 transition-transform duration-300 shadow-2xl">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-medium text-gray-800">Settings</h2>
-                <button onclick="closeSettings()" class="text-gray-400 hover:text-gray-800 transition-colors p-2 rounded-full hover:bg-gray-100">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+    <!-- Settings Modal Overlay -->
+    <div id="settings-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transform scale-95 transition-transform duration-200">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-semibold text-gray-800">Settings</h3>
+                <button id="close-settings-btn" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path></svg>
                 </button>
             </div>
-            
-            <div class="space-y-5">
-                <!-- User Name Setting -->
+            <div class="p-6 space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">User Name</label>
-                    <input type="text" id="settingUsername" placeholder="e.g. Alex" class="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:border-gemini-primary focus:ring-1 focus:ring-gemini-primary transition-all">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">OpenRouter API Key</label>
+                    <input type="password" id="api-key-input" class="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="sk-or-v1-...">
                 </div>
-                
-                <!-- Theme Setting -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Theme</label>
-                    <select class="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:border-gemini-primary appearance-none bg-white">
-                        <option value="light">Light (Default)</option>
-                        <option value="dark" disabled>Dark (Coming soon)</option>
-                    </select>
-                </div>
-
-                <!-- Danger Zone -->
-                <div class="pt-4 border-t border-gray-200 mt-4">
-                    <label class="block text-sm font-medium text-red-600 mb-2">Danger Zone</label>
-                    <button onclick="clearAllData()" class="w-full bg-red-50 text-red-600 hover:bg-red-100 font-medium py-2.5 px-4 rounded-xl transition-colors text-sm flex justify-center items-center gap-2">
-                        <i class="fa-solid fa-trash-can"></i>
-                        Clear All Chat History
-                    </button>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Model Name</label>
+                    <input type="text" id="model-name-input" class="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="google/gemini-pro">
+                    <p class="text-xs text-gray-500 mt-1">Default: google/gemini-2.5-flash</p>
                 </div>
             </div>
-            
-            <!-- Modal Actions -->
-            <div class="mt-8 flex justify-end gap-3">
-                <button onclick="closeSettings()" class="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-                <button onclick="saveSettings()" class="px-5 py-2.5 text-sm font-medium bg-gemini-primary hover:bg-blue-700 text-white rounded-xl transition-colors">Save Changes</button>
+            <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                <button id="cancel-settings-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button id="save-settings-btn" class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 shadow-sm">Save Changes</button>
             </div>
         </div>
     </div>
 
-    <!-- Vanilla JavaScript Logic -->
+    <!-- Application Logic -->
     <script>
-        /* ==========================================================================
-           STATE MANAGEMENT
-           ========================================================================== */
-        const STORAGE_KEY = 'universal_ai_chats';
-        const SETTINGS_KEY = 'universal_ai_settings';
-        
-        let chats = [];
-        let currentChatId = null;
-        let userSettings = { username: '' };
+        // DOM Elements
+        const DOM = {
+            sidebar: document.getElementById('sidebar'),
+            toggleSidebarBtn: document.getElementById('toggleSidebarBtn'),
+            closeSidebarBtn: document.getElementById('close-sidebar-btn'),
+            openSettingsBtn: document.getElementById('open-settings-btn'),
+            settingsModal: document.getElementById('settings-modal'),
+            closeSettingsBtn: document.getElementById('close-settings-btn'),
+            cancelSettingsBtn: document.getElementById('cancel-settings-btn'),
+            saveSettingsBtn: document.getElementById('save-settings-btn'),
+            apiKeyInput: document.getElementById('api-key-input'),
+            modelNameInput: document.getElementById('model-name-input'),
+            chatInput: document.getElementById('chat-input'),
+            sendBtn: document.getElementById('send-btn'),
+            messagesList: document.getElementById('messages-list'),
+            welcomeScreen: document.getElementById('welcome-screen'),
+            historyList: document.getElementById('history-list'),
+            newChatBtn: document.getElementById('new-chat-btn'),
+            chatContainer: document.getElementById('chat-container'),
+            loadingIndicator: document.getElementById('loading-indicator'),
+        };
 
-        // Load chats and settings from LocalStorage on init
-        function loadData() {
-            const savedChats = localStorage.getItem(STORAGE_KEY);
-            const savedSettings = localStorage.getItem(SETTINGS_KEY);
+        // State
+        let state = {
+            apiKey: localStorage.getItem('ai_api_key') || '',
+            modelName: localStorage.getItem('ai_model_name') || 'google/gemini-2.5-flash',
+            chats: JSON.parse(localStorage.getItem('ai_chats')) || [],
+            currentChatId: null,
+            isGenerating: false
+        };
+
+        // Auto-resize textarea
+        DOM.chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            DOM.sendBtn.disabled = this.value.trim() === '';
+        });
+
+        // Initialize App
+        function init() {
+            // Setup markdown config
+            marked.setOptions({ breaks: true, gfm: true });
             
-            if (savedChats) {
-                try { chats = JSON.parse(savedChats); } catch(e) { chats = []; }
-            }
-            if (savedSettings) {
-                try { 
-                    userSettings = JSON.parse(savedSettings); 
-                    updateWelcomeMessage();
-                } catch(e) { }
-            }
-        }
-
-        // Save chats state to LocalStorage
-        function saveChats() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
-        }
-
-        function updateWelcomeMessage() {
-            const welcomeEl = document.getElementById('welcomeText');
-            if(welcomeEl) {
-                welcomeEl.textContent = userSettings.username 
-                    ? `Hello ${userSettings.username}, how can I help?` 
-                    : `Hello, how can I help?`;
-            }
-        }
-
-        /* ==========================================================================
-           SETTINGS MODAL LOGIC
-           ========================================================================== */
-        
-        function openSettings() {
-            const modal = document.getElementById('settingsModal');
-            document.getElementById('settingUsername').value = userSettings.username || '';
-            
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            
-            // Trigger reflow for animation
-            void modal.offsetWidth;
-            modal.classList.remove('opacity-0');
-            modal.querySelector('div').classList.remove('scale-95');
-            
-            if(window.innerWidth < 1024) toggleSidebar(); // Close sidebar on mobile when opening settings
-        }
-
-        function closeSettings() {
-            const modal = document.getElementById('settingsModal');
-            modal.classList.add('opacity-0');
-            modal.querySelector('div').classList.add('scale-95');
-            
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modal.classList.remove('flex');
-            }, 300);
-        }
-
-        function saveSettings() {
-            userSettings.username = document.getElementById('settingUsername').value.trim();
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(userSettings));
-            updateWelcomeMessage();
-            closeSettings();
-        }
-
-        function clearAllData() {
-            if(confirm("Are you sure you want to delete all chat history? This action cannot be undone.")) {
-                chats = [];
-                currentChatId = null;
-                saveChats();
-                renderSidebar();
-                renderMessages();
-                closeSettings();
-            }
-        }
-
-        /* ==========================================================================
-           UI RENDERING & DOM MANIPULATION
-           ========================================================================== */
-        
-        // Toggle Mobile Sidebar
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            
-            if (sidebar.classList.contains('-translate-x-full')) {
-                sidebar.classList.remove('-translate-x-full');
-                overlay.classList.remove('hidden');
+            renderHistory();
+            if (state.chats.length > 0) {
+                loadChat(state.chats[0].id);
             } else {
-                sidebar.classList.add('-translate-x-full');
-                overlay.classList.add('hidden');
+                startNewChat();
             }
+            bindEvents();
         }
 
-        // Auto-resize textarea based on content
-        function adjustTextareaHeight(el) {
-            el.style.height = 'auto';
-            el.style.height = (el.scrollHeight) + 'px';
-            
-            const sendBtn = document.getElementById('sendBtn');
-            if(el.value.trim().length > 0) {
-                sendBtn.classList.remove('text-gray-400');
-                sendBtn.classList.add('text-gemini-primary');
-            } else {
-                sendBtn.classList.add('text-gray-400');
-                sendBtn.classList.remove('text-gemini-primary');
-            }
-        }
+        // Event Listeners
+        function bindEvents() {
+            // Sidebar toggles
+            const toggleSidebar = () => DOM.sidebar.classList.toggle('-translate-x-full');
+            document.getElementById('toggle-sidebar-btn').addEventListener('click', toggleSidebar);
+            DOM.closeSidebarBtn.addEventListener('click', toggleSidebar);
 
-        // Handle Enter to submit (Shift+Enter for new line)
-        function handleEnter(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                document.getElementById('chatForm').dispatchEvent(new Event('submit'));
-            }
-        }
-
-        // Render Sidebar Chat List
-        function renderSidebar() {
-            const chatList = document.getElementById('chatList');
-            chatList.innerHTML = '';
-
-            // Sort newest first
-            const sortedChats = [...chats].sort((a, b) => b.updatedAt - a.updatedAt);
-
-            sortedChats.forEach(chat => {
-                const li = document.createElement('li');
-                li.className = `group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${chat.id === currentChatId ? 'bg-blue-50 text-blue-800' : 'hover:bg-gray-200 text-gray-700'}`;
-                
-                li.innerHTML = `
-                    <div class="flex items-center gap-3 overflow-hidden flex-1" onclick="selectChat('${chat.id}')">
-                        <i class="fa-regular fa-message text-gray-400"></i>
-                        <span class="truncate text-sm font-medium">${chat.title}</span>
-                    </div>
-                    <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity">
-                        <i class="fa-solid fa-trash-can text-sm"></i>
-                    </button>
-                `;
-                chatList.appendChild(li);
+            // Settings Modal
+            const toggleSettings = () => {
+                DOM.settingsModal.classList.toggle('hidden');
+                DOM.apiKeyInput.value = state.apiKey;
+                DOM.modelNameInput.value = state.modelName;
+            };
+            DOM.openSettingsBtn.addEventListener('click', toggleSettings);
+            DOM.closeSettingsBtn.addEventListener('click', toggleSettings);
+            DOM.cancelSettingsBtn.addEventListener('click', toggleSettings);
+            DOM.saveSettingsBtn.addEventListener('click', () => {
+                state.apiKey = DOM.apiKeyInput.value.trim();
+                state.modelName = DOM.modelNameInput.value.trim() || 'google/gemini-2.5-flash';
+                localStorage.setItem('ai_api_key', state.apiKey);
+                localStorage.setItem('ai_model_name', state.modelName);
+                toggleSettings();
             });
-        }
 
-        // Format basic Markdown-like syntax for the AI response
-        function formatText(text) {
-            let formatted = text
-                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-                .replace(/\n/g, '<br>');
-            return `<div class="prose max-w-none text-base leading-relaxed">${formatted}</div>`;
-        }
-
-        // Render current chat messages
-        function renderMessages() {
-            const container = document.getElementById('chatContainer');
-            const welcomeScreen = document.getElementById('welcomeScreen');
-            const titleEl = document.getElementById('currentChatTitle');
-
-            // Clear container (keep welcome screen out of loop)
-            container.innerHTML = '';
-
-            const currentChat = chats.find(c => c.id === currentChatId);
-
-            if (!currentChat || currentChat.messages.length === 0) {
-                container.appendChild(welcomeScreen);
-                welcomeScreen.classList.remove('hidden');
-                titleEl.textContent = "Universal AI";
-                return;
-            }
-
-            welcomeScreen.classList.add('hidden');
-            titleEl.textContent = currentChat.title;
-
-            currentChat.messages.forEach(msg => {
-                const msgWrapper = document.createElement('div');
-                msgWrapper.className = `flex gap-4 mb-8 max-w-4xl mx-auto w-full px-4 lg:px-0`;
-
-                if (msg.role === 'user') {
-                    msgWrapper.innerHTML = `
-                        <div class="flex-1 flex justify-end">
-                            <div class="bg-gemini-userBubble text-gray-800 px-5 py-3.5 rounded-3xl rounded-tr-sm max-w-[85%]">
-                                ${msg.content}
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    msgWrapper.innerHTML = `
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-1">
-                            <i class="fa-solid fa-sparkles text-white text-xs"></i>
-                        </div>
-                        <div class="flex-1 pt-1 overflow-x-auto text-gray-800">
-                            ${formatText(msg.content)}
-                        </div>
-                    `;
+            // Chat Interactions
+            DOM.newChatBtn.addEventListener('click', startNewChat);
+            DOM.sendBtn.addEventListener('click', handleSend);
+            DOM.chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!DOM.sendBtn.disabled) handleSend();
                 }
-                container.appendChild(msgWrapper);
             });
-
-            // Scroll to bottom
-            container.scrollTop = container.scrollHeight;
         }
 
-        /* ==========================================================================
-           BUSINESS LOGIC & INTERACTION
-           ========================================================================== */
+        // Save History to LocalStorage
+        function saveChats() {
+            localStorage.setItem('ai_chats', JSON.stringify(state.chats));
+            renderHistory();
+        }
 
         // Start a new chat
         function startNewChat() {
-            currentChatId = null;
-            document.getElementById('messageInput').value = '';
-            adjustTextareaHeight(document.getElementById('messageInput'));
-            renderSidebar();
-            renderMessages();
-            
-            if(window.innerWidth < 1024) toggleSidebar();
-        }
-
-        // Select an existing chat
-        function selectChat(id) {
-            currentChatId = id;
-            renderSidebar();
-            renderMessages();
-            
-            if(window.innerWidth < 1024) toggleSidebar();
-        }
-
-        // Delete a chat
-        function deleteChat(e, id) {
-            e.stopPropagation(); 
-            chats = chats.filter(c => c.id !== id);
-            if (currentChatId === id) {
-                currentChatId = null;
-            }
+            state.currentChatId = Date.now().toString();
+            state.chats.unshift({
+                id: state.currentChatId,
+                title: 'New Chat',
+                messages: []
+            });
             saveChats();
-            renderSidebar();
             renderMessages();
+            if(window.innerWidth < 768) DOM.sidebar.classList.add('-translate-x-full');
         }
 
-        // Generate a simple title based on first user message
-        function generateTitle(text) {
-            const maxLen = 30;
-            const cleaned = text.trim();
-            return cleaned.length > maxLen ? cleaned.substring(0, maxLen) + '...' : cleaned;
+        // Load specific chat
+        function loadChat(id) {
+            state.currentChatId = id;
+            renderHistory();
+            renderMessages();
+            if(window.innerWidth < 768) DOM.sidebar.classList.add('-translate-x-full');
         }
 
-        // Generate ID
-        function generateId() {
-            return Date.now().toString(36) + Math.random().toString(36).substr(2);
-        }
-
-        // Mock AI Response Generator
-        function mockAiResponse(userText) {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    const responses = [
-                        "That's an interesting perspective. I'm designed to be a static interface for now, but I'm fully equipped to handle complex API integrations!",
-                        "Here is a simulated response. In a real-world application, this would stream data directly from an LLM endpoint.\n\n```js\nconsole.log('Hello World');\n```",
-                        "I understand. As a local, browser-based UI, I save all our conversations directly into your browser's `localStorage`.",
-                        "Absolutely! If you hook me up to a real backend or API key via fetch(), I can do much more."
-                    ];
-                    resolve(responses[Math.floor(Math.random() * responses.length)]);
-                }, 1500); 
+        // Render Sidebar History
+        function renderHistory() {
+            DOM.historyList.innerHTML = '';
+            state.chats.forEach(chat => {
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${
+                    chat.id === state.currentChatId 
+                    ? 'bg-brand-50 text-brand-700 font-medium' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`;
+                btn.textContent = chat.title || 'New Chat';
+                btn.onclick = () => loadChat(chat.id);
+                DOM.historyList.appendChild(btn);
             });
         }
 
-        // Show typing indicator
-        function appendTypingIndicator() {
-            const container = document.getElementById('chatContainer');
-            const indicator = document.createElement('div');
-            indicator.id = 'typingIndicator';
-            indicator.className = 'flex gap-4 mb-8 max-w-4xl mx-auto w-full px-4 lg:px-0';
-            indicator.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-1">
-                    <i class="fa-solid fa-sparkles text-white text-xs"></i>
-                </div>
-                <div class="flex-1 pt-3">
-                    <div class="typing-indicator">
-                        <span></span><span></span><span></span>
-                    </div>
-                </div>
-            `;
-            container.appendChild(indicator);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function removeTypingIndicator() {
-            const el = document.getElementById('typingIndicator');
-            if (el) el.remove();
-        }
-
-        // Handle sending a message
-        async function handleChatSubmit(e) {
-            e.preventDefault();
-            const inputEl = document.getElementById('messageInput');
-            const text = inputEl.value.trim();
+        // Render Messages in Main Area
+        function renderMessages() {
+            const currentChat = state.chats.find(c => c.id === state.currentChatId);
+            DOM.messagesList.innerHTML = '';
             
-            if (!text) return;
-
-            // Clear input and reset height
-            inputEl.value = '';
-            adjustTextareaHeight(inputEl);
-            
-            // Create chat if none exists
-            if (!currentChatId) {
-                const newChat = {
-                    id: generateId(),
-                    title: generateTitle(text),
-                    updatedAt: Date.now(),
-                    messages: []
-                };
-                chats.push(newChat);
-                currentChatId = newChat.id;
+            if (!currentChat || currentChat.messages.length === 0) {
+                DOM.welcomeScreen.classList.remove('hidden');
+                DOM.messagesList.classList.add('hidden');
+                return;
             }
 
-            const currentChat = chats.find(c => c.id === currentChatId);
-            
-            // Add User message
-            currentChat.messages.push({ role: 'user', content: text });
-            currentChat.updatedAt = Date.now();
-            saveChats();
-            renderSidebar();
-            renderMessages();
+            DOM.welcomeScreen.classList.add('hidden');
+            DOM.messagesList.classList.remove('hidden');
 
-            // Show loading
-            appendTypingIndicator();
-            inputEl.disabled = true;
-
-            // Fetch AI Response (Mocked here)
-            const aiText = await mockAiResponse(text);
-
-            // Remove loading and append AI message
-            removeTypingIndicator();
-            inputEl.disabled = false;
-            inputEl.focus();
-
-            currentChat.messages.push({ role: 'ai', content: aiText });
-            currentChat.updatedAt = Date.now();
-            
-            saveChats();
-            renderSidebar();
-            renderMessages();
+            currentChat.messages.forEach(msg => {
+                const msgEl = document.createElement('div');
+                msgEl.className = 'flex gap-4 items-start w-full';
+                
+                if (msg.role === 'user') {
+                    msgEl.innerHTML = `
+                        <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 mt-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#475569" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24ZM74.08,197.5a64,64,0,0,1,107.84,0,87.83,87.83,0,0,1-107.84,0ZM96,120a32,32,0,1,1,32,32A32,32,0,0,1,96,120Zm97.76,66.41a79.66,79.66,0,0,0-36.06-28.75,48,48,0,1,0-59.4,0,79.66,79.66,0,0,0-36.06,28.75,88,88,0,1,1,131.52,0Z"></path></svg>
+                        </div>
+                        <div class="bg-white border border-gray-100 shadow-sm px-5 py-3.5 rounded-2xl rounded-tr-sm text-gray-800 flex-1 max-w-[85%] ml-auto text-[15px] leading-relaxed">
+                            ${DOMPurify.sanitize(msg.content.replace(/\n/g, '<br>'))}
+                        </div>
+                    `;
+                } else {
+                    const parsedHtml = DOMPurify.sanitize(marked.parse(msg.content));
+                    msgEl.innerHTML = `
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center flex-shrink-0 mt-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#ffffff" viewBox="0 0 256 256"><path d="M216.51,202.26a119.5,119.5,0,0,0-36.63-125A120,120,0,0,0,67.6,170.83,119.5,119.5,0,0,0,39.49,202.26a8,8,0,0,0,3.31,12.5A128,128,0,0,0,128,248h0a128,128,0,0,0,85.2-33.24A8,8,0,0,0,216.51,202.26ZM128,232a112,112,0,0,1-72-26.47,103.73,103.73,0,0,1,25-24A104,104,0,0,1,128,160a104,104,0,0,1,47,11.53,103.73,103.73,0,0,1,25,24A112,112,0,0,1,128,232Z"></path></svg>
+                        </div>
+                        <div class="prose prose-sm max-w-none w-full bg-gray-50/80 px-5 py-3.5 rounded-2xl rounded-tl-sm text-gray-800 text-[15px] leading-relaxed border border-gray-100">
+                            ${parsedHtml}
+                        </div>
+                    `;
+                }
+                DOM.messagesList.appendChild(msgEl);
+            });
+            scrollToBottom();
         }
 
-        /* ==========================================================================
-           INITIALIZATION
-           ========================================================================== */
-        function init() {
-            loadData();
-            renderSidebar();
-            renderMessages();
-            document.getElementById('messageInput').focus();
+        // Scroll to bottom
+        function scrollToBottom() {
+            DOM.chatContainer.scrollTop = DOM.chatContainer.scrollHeight;
         }
 
-        // Boot up the app
+        // Handle Send Message
+        async function handleSend() {
+            if (state.isGenerating || !state.apiKey) {
+                if(!state.apiKey) {
+                    alert("Please set your OpenRouter API Key in the Settings first.");
+                    DOM.openSettingsBtn.click();
+                }
+                return;
+            }
+
+            const content = DOM.chatInput.value.trim();
+            if (!content) return;
+
+            // Reset Input
+            DOM.chatInput.value = '';
+            DOM.chatInput.style.height = 'auto';
+            DOM.sendBtn.disabled = true;
+
+            const currentChat = state.chats.find(c => c.id === state.currentChatId);
+            
+            // Generate title on first message
+            if (currentChat.messages.length === 0) {
+                currentChat.title = content.slice(0, 30) + (content.length > 30 ? '...' : '');
+            }
+
+            // Add user message
+            currentChat.messages.push({ role: 'user', content });
+            saveChats();
+            renderMessages();
+
+            // Prepare for API call
+            state.isGenerating = true;
+            DOM.loadingIndicator.classList.remove('hidden');
+            scrollToBottom();
+
+            // OpenRouter API Fetch
+            try {
+                // Filter messages to format accepted by API
+                const apiMessages = currentChat.messages.map(m => ({
+                    role: m.role,
+                    content: m.content
+                }));
+
+                const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${state.apiKey}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: state.modelName,
+                        messages: apiMessages
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error.message || "API Error");
+
+                const reply = data.choices[0].message.content;
+                currentChat.messages.push({ role: 'assistant', content: reply });
+
+            } catch (error) {
+                console.error(error);
+                currentChat.messages.push({ 
+                    role: 'assistant', 
+                    content: `**Error:** ${error.message}. Please check your API key and model name.` 
+                });
+            } finally {
+                state.isGenerating = false;
+                DOM.loadingIndicator.classList.add('hidden');
+                saveChats();
+                renderMessages();
+            }
+        }
+
+        // Bootstrap
         init();
-
     </script>
 </body>
 </html>
