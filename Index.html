@@ -106,9 +106,9 @@
         </div>
         
         <!-- Bottom settings/user area -->
-        <div class="p-4 border-t border-gray-200 text-sm text-gray-600 hover:bg-gray-100 cursor-pointer rounded-lg mx-2 mb-2 transition-colors">
+        <div onclick="openSettings()" class="p-4 border-t border-gray-200 text-sm text-gray-600 hover:bg-gray-100 cursor-pointer rounded-lg mx-2 mb-2 transition-colors">
             <div class="flex items-center gap-3">
-                <i class="fa-regular fa-user-circle text-xl"></i>
+                <i class="fa-solid fa-gear text-xl"></i>
                 <span>Settings</span>
             </div>
         </div>
@@ -136,7 +136,7 @@
                 <div class="w-20 h-20 bg-gemini-bg rounded-full flex items-center justify-center mb-6 shadow-sm">
                     <i class="fa-solid fa-sparkles text-3xl text-gemini-primary"></i>
                 </div>
-                <h2 class="text-3xl lg:text-4xl font-medium mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
+                <h2 id="welcomeText" class="text-3xl lg:text-4xl font-medium mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
                     Hello, how can I help?
                 </h2>
                 <p class="text-gray-500 text-lg max-w-md">I'm a universal AI assistant. Ask me anything, or pick a conversation from the sidebar.</p>
@@ -166,31 +166,138 @@
         </div>
     </main>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/40 z-50 hidden flex-col items-center justify-center transition-opacity opacity-0 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-md p-6 transform scale-95 transition-transform duration-300 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-medium text-gray-800">Settings</h2>
+                <button onclick="closeSettings()" class="text-gray-400 hover:text-gray-800 transition-colors p-2 rounded-full hover:bg-gray-100">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-5">
+                <!-- User Name Setting -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">User Name</label>
+                    <input type="text" id="settingUsername" placeholder="e.g. Alex" class="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:border-gemini-primary focus:ring-1 focus:ring-gemini-primary transition-all">
+                </div>
+                
+                <!-- Theme Setting -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Theme</label>
+                    <select class="w-full border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:border-gemini-primary appearance-none bg-white">
+                        <option value="light">Light (Default)</option>
+                        <option value="dark" disabled>Dark (Coming soon)</option>
+                    </select>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="pt-4 border-t border-gray-200 mt-4">
+                    <label class="block text-sm font-medium text-red-600 mb-2">Danger Zone</label>
+                    <button onclick="clearAllData()" class="w-full bg-red-50 text-red-600 hover:bg-red-100 font-medium py-2.5 px-4 rounded-xl transition-colors text-sm flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-trash-can"></i>
+                        Clear All Chat History
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Modal Actions -->
+            <div class="mt-8 flex justify-end gap-3">
+                <button onclick="closeSettings()" class="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
+                <button onclick="saveSettings()" class="px-5 py-2.5 text-sm font-medium bg-gemini-primary hover:bg-blue-700 text-white rounded-xl transition-colors">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Vanilla JavaScript Logic -->
     <script>
         /* ==========================================================================
            STATE MANAGEMENT
            ========================================================================== */
         const STORAGE_KEY = 'universal_ai_chats';
+        const SETTINGS_KEY = 'universal_ai_settings';
         
         let chats = [];
         let currentChatId = null;
+        let userSettings = { username: '' };
 
-        // Load chats from LocalStorage on init
-        function loadChats() {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                try {
-                    chats = JSON.parse(saved);
-                } catch(e) {
-                    chats = [];
-                }
+        // Load chats and settings from LocalStorage on init
+        function loadData() {
+            const savedChats = localStorage.getItem(STORAGE_KEY);
+            const savedSettings = localStorage.getItem(SETTINGS_KEY);
+            
+            if (savedChats) {
+                try { chats = JSON.parse(savedChats); } catch(e) { chats = []; }
+            }
+            if (savedSettings) {
+                try { 
+                    userSettings = JSON.parse(savedSettings); 
+                    updateWelcomeMessage();
+                } catch(e) { }
             }
         }
 
-        // Save state to LocalStorage
+        // Save chats state to LocalStorage
         function saveChats() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+        }
+
+        function updateWelcomeMessage() {
+            const welcomeEl = document.getElementById('welcomeText');
+            if(welcomeEl) {
+                welcomeEl.textContent = userSettings.username 
+                    ? `Hello ${userSettings.username}, how can I help?` 
+                    : `Hello, how can I help?`;
+            }
+        }
+
+        /* ==========================================================================
+           SETTINGS MODAL LOGIC
+           ========================================================================== */
+        
+        function openSettings() {
+            const modal = document.getElementById('settingsModal');
+            document.getElementById('settingUsername').value = userSettings.username || '';
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // Trigger reflow for animation
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            modal.querySelector('div').classList.remove('scale-95');
+            
+            if(window.innerWidth < 1024) toggleSidebar(); // Close sidebar on mobile when opening settings
+        }
+
+        function closeSettings() {
+            const modal = document.getElementById('settingsModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 300);
+        }
+
+        function saveSettings() {
+            userSettings.username = document.getElementById('settingUsername').value.trim();
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(userSettings));
+            updateWelcomeMessage();
+            closeSettings();
+        }
+
+        function clearAllData() {
+            if(confirm("Are you sure you want to delete all chat history? This action cannot be undone.")) {
+                chats = [];
+                currentChatId = null;
+                saveChats();
+                renderSidebar();
+                renderMessages();
+                closeSettings();
+            }
         }
 
         /* ==========================================================================
@@ -261,7 +368,6 @@
 
         // Format basic Markdown-like syntax for the AI response
         function formatText(text) {
-            // Very basic formatter: Backticks for code, double star for bold
             let formatted = text
                 .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -332,7 +438,6 @@
             renderSidebar();
             renderMessages();
             
-            // On mobile, close sidebar when clicking new chat
             if(window.innerWidth < 1024) toggleSidebar();
         }
 
@@ -347,7 +452,7 @@
 
         // Delete a chat
         function deleteChat(e, id) {
-            e.stopPropagation(); // Prevent triggering selectChat
+            e.stopPropagation(); 
             chats = chats.filter(c => c.id !== id);
             if (currentChatId === id) {
                 currentChatId = null;
@@ -369,7 +474,7 @@
             return Date.now().toString(36) + Math.random().toString(36).substr(2);
         }
 
-        // Mock AI Response Generator (To replace with real API call if needed)
+        // Mock AI Response Generator
         function mockAiResponse(userText) {
             return new Promise((resolve) => {
                 setTimeout(() => {
@@ -380,7 +485,7 @@
                         "Absolutely! If you hook me up to a real backend or API key via fetch(), I can do much more."
                     ];
                     resolve(responses[Math.floor(Math.random() * responses.length)]);
-                }, 1500); // 1.5s delay to simulate network
+                }, 1500); 
             });
         }
 
@@ -466,7 +571,7 @@
            INITIALIZATION
            ========================================================================== */
         function init() {
-            loadChats();
+            loadData();
             renderSidebar();
             renderMessages();
             document.getElementById('messageInput').focus();
