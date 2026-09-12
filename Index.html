@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal AI Chat</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Optional Custom Configuration for Tailwind to match Gemini colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gemini: {
+                            bg: '#f0f4f9',
+                            sidebar: '#e3e3e3',
+                            userBubble: '#e3e3e3',
+                            text: '#1f1f1f',
+                            primary: '#0b57d0'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Google Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Minimalist Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Markdown-like formatting styles for AI output */
+        .prose p { margin-bottom: 1em; }
+        .prose pre { background: #1e293b; color: #f8fafc; padding: 1em; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 1em; }
+        .prose code { font-family: monospace; background: #f1f5f9; padding: 0.2em 0.4em; border-radius: 0.25rem; }
+        .prose pre code { background: transparent; padding: 0; }
+        
+        /* Loader animation */
+        .typing-indicator span {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: #94a3b8;
+            border-radius: 50%;
+            margin-right: 4px;
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="flex h-screen w-full bg-white text-gemini-text antialiased overflow-hidden selection:bg-blue-200">
+
+    <!-- Mobile Overlay -->
+    <div id="mobileOverlay" class="fixed inset-0 bg-black/50 z-20 hidden lg:hidden transition-opacity" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-30 w-72 bg-gemini-bg transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col border-r border-gray-200">
+        <!-- Logo & Mobile Close -->
+        <div class="flex items-center justify-between p-4 ml-2">
+            <div class="flex items-center gap-3 text-xl font-medium cursor-pointer">
+                <i class="fa-solid fa-sparkles text-gemini-primary"></i>
+                <span>Universal AI</span>
+            </div>
+            <button class="lg:hidden text-gray-500 hover:text-gray-800 p-2" onclick="toggleSidebar()">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <!-- New Chat Button -->
+        <div class="px-4 py-2">
+            <button onclick="startNewChat()" class="flex items-center gap-3 w-full bg-white hover:bg-gray-100 border border-gray-200 text-sm font-medium py-3 px-4 rounded-full transition-colors shadow-sm">
+                <i class="fa-solid fa-plus"></i>
+                New chat
+            </button>
+        </div>
+
+        <!-- Chat History List -->
+        <div class="flex-1 overflow-y-auto mt-4 px-3 pb-4">
+            <p class="text-xs font-semibold text-gray-500 mb-2 px-3 uppercase tracking-wider">Recent</p>
+            <ul id="chatList" class="space-y-1">
+                <!-- Chat history items injected here via JS -->
+            </ul>
+        </div>
+        
+        <!-- Bottom settings/user area -->
+        <div class="p-4 border-t border-gray-200 text-sm text-gray-600 hover:bg-gray-100 cursor-pointer rounded-lg mx-2 mb-2 transition-colors">
+            <div class="flex items-center gap-3">
+                <i class="fa-regular fa-user-circle text-xl"></i>
+                <span>Settings</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col relative h-full w-full bg-white transition-all duration-300">
+        
+        <!-- Top Navigation -->
+        <header class="flex items-center justify-between p-4 lg:px-8 absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-white to-transparent h-20">
+            <div class="flex items-center gap-4">
+                <button class="lg:hidden text-gray-500 hover:text-gray-800 p-2 -ml-2" onclick="toggleSidebar()">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <h1 id="currentChatTitle" class="text-xl lg:text-2xl font-medium text-gray-400 truncate">Universal AI</h1>
+            </div>
+        </header>
+
+        <!-- Chat Messages Container -->
+        <div id="chatContainer" class="flex-1 overflow-y-auto px-4 lg:px-32 pt-24 pb-32 scroll-smooth">
+            <!-- Messages injected here via JS -->
+            
+            <!-- Empty State / Welcome Screen -->
+            <div id="welcomeScreen" class="h-full flex flex-col items-center justify-center text-center px-4 fade-in">
+                <div class="w-20 h-20 bg-gemini-bg rounded-full flex items-center justify-center mb-6 shadow-sm">
+                    <i class="fa-solid fa-sparkles text-3xl text-gemini-primary"></i>
+                </div>
+                <h2 class="text-3xl lg:text-4xl font-medium mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
+                    Hello, how can I help?
+                </h2>
+                <p class="text-gray-500 text-lg max-w-md">I'm a universal AI assistant. Ask me anything, or pick a conversation from the sidebar.</p>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-6 pb-6 px-4 lg:px-32">
+            <div class="max-w-4xl mx-auto relative group">
+                <form id="chatForm" onsubmit="handleChatSubmit(event)" class="relative flex items-end">
+                    <textarea 
+                        id="messageInput"
+                        rows="1"
+                        placeholder="Enter a prompt here..."
+                        class="w-full bg-gemini-bg focus:bg-white border border-transparent focus:border-gray-300 rounded-3xl py-4 pl-6 pr-16 resize-none outline-none shadow-sm transition-all text-base max-h-48 overflow-y-auto"
+                        oninput="adjustTextareaHeight(this)"
+                        onkeydown="handleEnter(event)"
+                    ></textarea>
+                    <button type="submit" id="sendBtn" class="absolute right-3 bottom-3 p-2 bg-transparent text-gray-400 hover:text-gemini-primary rounded-full transition-colors disabled:opacity-50">
+                        <i class="fa-solid fa-paper-plane text-xl"></i>
+                    </button>
+                </form>
+                <div class="text-center mt-3 text-xs text-gray-400">
+                    AI can make mistakes. Consider verifying important information.
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Vanilla JavaScript Logic -->
+    <script>
+        /* ==========================================================================
+           STATE MANAGEMENT
+           ========================================================================== */
+        const STORAGE_KEY = 'universal_ai_chats';
+        
+        let chats = [];
+        let currentChatId = null;
+
+        // Load chats from LocalStorage on init
+        function loadChats() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    chats = JSON.parse(saved);
+                } catch(e) {
+                    chats = [];
+                }
+            }
+        }
+
+        // Save state to LocalStorage
+        function saveChats() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+        }
+
+        /* ==========================================================================
+           UI RENDERING & DOM MANIPULATION
+           ========================================================================== */
+        
+        // Toggle Mobile Sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            
+            if (sidebar.classList.contains('-translate-x-full')) {
+                sidebar.classList.remove('-translate-x-full');
+                overlay.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+            }
+        }
+
+        // Auto-resize textarea based on content
+        function adjustTextareaHeight(el) {
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight) + 'px';
+            
+            const sendBtn = document.getElementById('sendBtn');
+            if(el.value.trim().length > 0) {
+                sendBtn.classList.remove('text-gray-400');
+                sendBtn.classList.add('text-gemini-primary');
+            } else {
+                sendBtn.classList.add('text-gray-400');
+                sendBtn.classList.remove('text-gemini-primary');
+            }
+        }
+
+        // Handle Enter to submit (Shift+Enter for new line)
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+            }
+        }
+
+        // Render Sidebar Chat List
+        function renderSidebar() {
+            const chatList = document.getElementById('chatList');
+            chatList.innerHTML = '';
+
+            // Sort newest first
+            const sortedChats = [...chats].sort((a, b) => b.updatedAt - a.updatedAt);
+
+            sortedChats.forEach(chat => {
+                const li = document.createElement('li');
+                li.className = `group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${chat.id === currentChatId ? 'bg-blue-50 text-blue-800' : 'hover:bg-gray-200 text-gray-700'}`;
+                
+                li.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden flex-1" onclick="selectChat('${chat.id}')">
+                        <i class="fa-regular fa-message text-gray-400"></i>
+                        <span class="truncate text-sm font-medium">${chat.title}</span>
+                    </div>
+                    <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 transition-opacity">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
+                `;
+                chatList.appendChild(li);
+            });
+        }
+
+        // Format basic Markdown-like syntax for the AI response
+        function formatText(text) {
+            // Very basic formatter: Backticks for code, double star for bold
+            let formatted = text
+                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            return `<div class="prose max-w-none text-base leading-relaxed">${formatted}</div>`;
+        }
+
+        // Render current chat messages
+        function renderMessages() {
+            const container = document.getElementById('chatContainer');
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            const titleEl = document.getElementById('currentChatTitle');
+
+            // Clear container (keep welcome screen out of loop)
+            container.innerHTML = '';
+
+            const currentChat = chats.find(c => c.id === currentChatId);
+
+            if (!currentChat || currentChat.messages.length === 0) {
+                container.appendChild(welcomeScreen);
+                welcomeScreen.classList.remove('hidden');
+                titleEl.textContent = "Universal AI";
+                return;
+            }
+
+            welcomeScreen.classList.add('hidden');
+            titleEl.textContent = currentChat.title;
+
+            currentChat.messages.forEach(msg => {
+                const msgWrapper = document.createElement('div');
+                msgWrapper.className = `flex gap-4 mb-8 max-w-4xl mx-auto w-full px-4 lg:px-0`;
+
+                if (msg.role === 'user') {
+                    msgWrapper.innerHTML = `
+                        <div class="flex-1 flex justify-end">
+                            <div class="bg-gemini-userBubble text-gray-800 px-5 py-3.5 rounded-3xl rounded-tr-sm max-w-[85%]">
+                                ${msg.content}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    msgWrapper.innerHTML = `
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-1">
+                            <i class="fa-solid fa-sparkles text-white text-xs"></i>
+                        </div>
+                        <div class="flex-1 pt-1 overflow-x-auto text-gray-800">
+                            ${formatText(msg.content)}
+                        </div>
+                    `;
+                }
+                container.appendChild(msgWrapper);
+            });
+
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        /* ==========================================================================
+           BUSINESS LOGIC & INTERACTION
+           ========================================================================== */
+
+        // Start a new chat
+        function startNewChat() {
+            currentChatId = null;
+            document.getElementById('messageInput').value = '';
+            adjustTextareaHeight(document.getElementById('messageInput'));
+            renderSidebar();
+            renderMessages();
+            
+            // On mobile, close sidebar when clicking new chat
+            if(window.innerWidth < 1024) toggleSidebar();
+        }
+
+        // Select an existing chat
+        function selectChat(id) {
+            currentChatId = id;
+            renderSidebar();
+            renderMessages();
+            
+            if(window.innerWidth < 1024) toggleSidebar();
+        }
+
+        // Delete a chat
+        function deleteChat(e, id) {
+            e.stopPropagation(); // Prevent triggering selectChat
+            chats = chats.filter(c => c.id !== id);
+            if (currentChatId === id) {
+                currentChatId = null;
+            }
+            saveChats();
+            renderSidebar();
+            renderMessages();
+        }
+
+        // Generate a simple title based on first user message
+        function generateTitle(text) {
+            const maxLen = 30;
+            const cleaned = text.trim();
+            return cleaned.length > maxLen ? cleaned.substring(0, maxLen) + '...' : cleaned;
+        }
+
+        // Generate ID
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        // Mock AI Response Generator (To replace with real API call if needed)
+        function mockAiResponse(userText) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const responses = [
+                        "That's an interesting perspective. I'm designed to be a static interface for now, but I'm fully equipped to handle complex API integrations!",
+                        "Here is a simulated response. In a real-world application, this would stream data directly from an LLM endpoint.\n\n```js\nconsole.log('Hello World');\n```",
+                        "I understand. As a local, browser-based UI, I save all our conversations directly into your browser's `localStorage`.",
+                        "Absolutely! If you hook me up to a real backend or API key via fetch(), I can do much more."
+                    ];
+                    resolve(responses[Math.floor(Math.random() * responses.length)]);
+                }, 1500); // 1.5s delay to simulate network
+            });
+        }
+
+        // Show typing indicator
+        function appendTypingIndicator() {
+            const container = document.getElementById('chatContainer');
+            const indicator = document.createElement('div');
+            indicator.id = 'typingIndicator';
+            indicator.className = 'flex gap-4 mb-8 max-w-4xl mx-auto w-full px-4 lg:px-0';
+            indicator.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0 mt-1">
+                    <i class="fa-solid fa-sparkles text-white text-xs"></i>
+                </div>
+                <div class="flex-1 pt-3">
+                    <div class="typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(indicator);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const el = document.getElementById('typingIndicator');
+            if (el) el.remove();
+        }
+
+        // Handle sending a message
+        async function handleChatSubmit(e) {
+            e.preventDefault();
+            const inputEl = document.getElementById('messageInput');
+            const text = inputEl.value.trim();
+            
+            if (!text) return;
+
+            // Clear input and reset height
+            inputEl.value = '';
+            adjustTextareaHeight(inputEl);
+            
+            // Create chat if none exists
+            if (!currentChatId) {
+                const newChat = {
+                    id: generateId(),
+                    title: generateTitle(text),
+                    updatedAt: Date.now(),
+                    messages: []
+                };
+                chats.push(newChat);
+                currentChatId = newChat.id;
+            }
+
+            const currentChat = chats.find(c => c.id === currentChatId);
+            
+            // Add User message
+            currentChat.messages.push({ role: 'user', content: text });
+            currentChat.updatedAt = Date.now();
+            saveChats();
+            renderSidebar();
+            renderMessages();
+
+            // Show loading
+            appendTypingIndicator();
+            inputEl.disabled = true;
+
+            // Fetch AI Response (Mocked here)
+            const aiText = await mockAiResponse(text);
+
+            // Remove loading and append AI message
+            removeTypingIndicator();
+            inputEl.disabled = false;
+            inputEl.focus();
+
+            currentChat.messages.push({ role: 'ai', content: aiText });
+            currentChat.updatedAt = Date.now();
+            
+            saveChats();
+            renderSidebar();
+            renderMessages();
+        }
+
+        /* ==========================================================================
+           INITIALIZATION
+           ========================================================================== */
+        function init() {
+            loadChats();
+            renderSidebar();
+            renderMessages();
+            document.getElementById('messageInput').focus();
+        }
+
+        // Boot up the app
+        init();
+
+    </script>
+</body>
+</html>
